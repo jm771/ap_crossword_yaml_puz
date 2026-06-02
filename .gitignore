@@ -1,0 +1,13 @@
+# See https://help.github.com/ignore-files/ for more about ignoring files.
+dist/
+.cache/
+.claude.json
+.claude.json.backup
+.claude/
+.config/
+.npm/
+
+
+# dependencies
+/node_modules
+

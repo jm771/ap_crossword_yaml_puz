@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import ReactDOM from "react-dom/client";
 import "./RandomizerGame.css";
 import { Box, Button, Typography, styled } from "@mui/material";
+import { deflate } from "pako";
+import { load, dump } from "js-yaml";
 
 const VisuallyHiddenInput = styled('input')({
   clip: 'rect(0 0 0 0)',
@@ -16,19 +18,47 @@ const VisuallyHiddenInput = styled('input')({
 });
 
 function Page() {
-  const [yaml, setYaml] = useState<File | null>(null);
-  const [puz64, setPuz64] = useState<string | null>(null);
+  const [yamlFile, setYamlFile] = useState<File | null>(null);
+  const [puzFile, setPuzFile] = useState<File | null>(null);
 
-  function getBase64(file) {
-   var reader = new FileReader();
-   reader.readAsDataURL(file);
-   reader.onload = function () {
-     setPuz64(reader.result as string);
-   };
-   reader.onerror = function (error) {
-     console.log('Error: ', error);
-   };
-}
+  async function downloadModifiedYaml() {
+    if (!yamlFile || !puzFile) return;
+
+    try {
+      const yamlText = await yamlFile.text();
+      const yamlData = load(yamlText) as any;
+
+      if (!yamlData || !yamlData.Crossword) {
+        alert('Invalid YAML file: No Crossword section found');
+        return;
+      }
+
+      const puzArrayBuffer = await puzFile.arrayBuffer();
+      const puzUint8Array = new Uint8Array(puzArrayBuffer);
+
+      const compressed = deflate(puzUint8Array);
+      const base64 = btoa(String.fromCharCode(...compressed));
+
+
+      delete yamlData.Crossword.puz_file_path;
+      yamlData.Crossword.puz_file_contents = base64;
+
+      const modifiedYaml = dump(yamlData, {
+        noRefs: true, 
+      });
+
+      const blob = new Blob([modifiedYaml], { type: 'text/yaml' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = yamlFile.name;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error processing files:', error);
+      alert(`Error processing files: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
 
   return (<>
  <Box className="randomizer-header" p={2}>
@@ -46,8 +76,8 @@ function Page() {
   Upload Yaml
   <VisuallyHiddenInput
     type="file"
-    accept=".yaml"
-    onChange={(event: { target: { files: any; }; }) => setYaml(event.target.files[0])}
+    accept=".yaml,.yml"
+    onChange={(event: { target: { files: any; }; }) => event.target.files?.[0] && setYamlFile(event.target.files[0])}
   />
 </Button>
 <Button
@@ -60,15 +90,14 @@ function Page() {
   <VisuallyHiddenInput
     type="file"
     accept=".puz"
-    onChange={(event: { target: { files: any; }; }) => getBase64(event.target.files[0])}
+    onChange={(event: { target: { files: any; }; }) => event.target.files?.[0] && setPuzFile(event.target.files[0])}
   />
 </Button>
 <Button
-  component="label"
-  role={undefined}
   variant="contained"
-  disabled={!yaml || !puz64}
+  disabled={!yamlFile || !puzFile}
   tabIndex={-1}
+  onClick={downloadModifiedYaml}
 >Download Result Yaml</Button>
 </Box>
 </>)

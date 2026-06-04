@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  base: '/ap_crossword/',
+  base: '/ap_crossword_yaml_puz/',
   define: {
     'process.env': {},
   },
